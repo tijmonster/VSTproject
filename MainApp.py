@@ -121,21 +121,22 @@ class MainApp:
 
             # Plugin details
             plugin_text = (f'{plugin["plugin_name"]} - {plugin["manufacturer"]} - '
-                           f'Licentie: {plugin["license_type"]}')
+                           f'Licentie: {plugin["license_type"]} - Prijs: {plugin["price"]}')
             label = Label(frame, text=plugin_text, font=("Arial", 12), bg="#f5f5f5")
             label.pack(side="left")
 
             # Buttons
             if owned:
-                cancel_button = Button(
-                    frame,
-                    text="Annuleer Licentie",
-                    command=lambda p=plugin: self.cancel_license(p),
-                    font=("Arial", 10),
-                    bg="#F44336",
-                    fg="white"
-                )
-                cancel_button.pack(side="right", padx=5)
+                if plugin["license_type"] != "One Time Payment":
+                    cancel_button = Button(
+                        frame,
+                        text="Annuleer Licentie",
+                        command=lambda p=plugin: self.cancel_license(p),
+                        font=("Arial", 10),
+                        bg="#F44336",
+                        fg="white"
+                    )
+                    cancel_button.pack(side="right", padx=5)
                 download_button = Button(
                     frame,
                     text="Download",
@@ -148,7 +149,7 @@ class MainApp:
             else:
                 buy_button = Button(
                     frame,
-                    text="Koop",
+                    text=f"Koop (€{plugin['price']})",
                     command=lambda p=plugin: self.buy_plugin(p),
                     font=("Arial", 10),
                     bg="#4CAF50",
@@ -252,19 +253,34 @@ class MainApp:
         button_3.image = button_image_3
         button_3.place(x=94.0, y=650.0, width=230.0, height=75.0)
 
-        # Main area for listing plugins
+
         self.listbox_label = Label(self.window, text="Beschikbare Plug-ins", font=("Arial", 16), bg="#FFFFFF")
         self.listbox_label.place(x=500, y=50)
 
-        self.plugins_frame = Frame(self.window, bg="#FFFFFF")
-        self.plugins_frame.place(x=500, y=100)
 
-        scrollbar = Scrollbar(self.window, command=self.plugins_frame.yview)
-        scrollbar.place(x=1350, y=100, height=500)
+        self.plugins_canvas = Canvas(self.window, bg="#FFFFFF", height=600, width=800)
+        self.plugins_canvas.place(x=500, y=100)
+
+        self.scrollbar = Scrollbar(self.window, orient="vertical", command=self.plugins_canvas.yview)
+        self.scrollbar.place(x=1350, y=100, height=600)
+
+        self.plugins_canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Create a frame inside the canvas to hold the plugin elements
+        self.plugins_frame = Frame(self.plugins_canvas, bg="#FFFFFF")
+        self.plugins_frame.bind(
+            "<Configure>",
+            lambda e: self.plugins_canvas.configure(
+                scrollregion=self.plugins_canvas.bbox("all")
+            )
+        )
+
+        self.plugins_canvas.create_window((0, 0), window=self.plugins_frame, anchor="nw")
 
     def run(self):
         self.window.resizable(False, False)
         self.window.mainloop()
+
 
 class AdminApp:
     def __init__(self, user):
@@ -296,15 +312,16 @@ class AdminApp:
     def add_plugin(self):
         plugin_name = self.entry_name.get()
         license_type = self.entry_license.get()
+        price = self.entry_price.get()
         manufacturer = self.current_user
 
-        if not plugin_name or not license_type:
+        if not plugin_name or not license_type or not price:
             messagebox.showerror("Fout", "Vul alle velden in.")
             return
 
         plugins = self.read_csv(self.plugin_file)
-        plugins.append({"plugin_name": plugin_name, "manufacturer": manufacturer, "license_type": license_type})
-        self.write_csv(self.plugin_file, plugins, fieldnames=["plugin_name", "manufacturer", "license_type"])
+        plugins.append({"plugin_name": plugin_name, "manufacturer": manufacturer, "license_type": license_type, "price": price})
+        self.write_csv(self.plugin_file, plugins, fieldnames=["plugin_name", "manufacturer", "license_type", "price"])
 
         messagebox.showinfo("Succes", f"Plug-in '{plugin_name}' is toegevoegd aan beschikbare plug-ins!")
 
@@ -320,9 +337,9 @@ class AdminApp:
         )
         canvas.place(x=0, y=0)
 
-        button_image_4 = PhotoImage(file=self.relative_to_assets("button_4.png"))
         button_4 = Button(
-            image=button_image_4,
+            self.window,
+            text="Toevoegen",
             borderwidth=0,
             highlightthickness=0,
             command=self.add_plugin,
@@ -330,23 +347,23 @@ class AdminApp:
         )
         button_4.place(
             x=212.0,
-            y=272.99999487399896,
-            width=211.0000026822081,
-            height=51.000000774860155
+            y=273.0,
+            width=211.0,
+            height=51.0
         )
 
         canvas.create_text(
-            279.00001525878906,
-            165.99999946355638,
+            202.0,
+            109.99999946355638,
             anchor="nw",
-            text="Licentie type",
+            text="Licentie type (One Time Payment, Subscription, etc.)",
             fill="#000000",
             font=("Inter", 12 * -1)
         )
 
         canvas.create_text(
-            271.00001525878906,
-            84.99999946355638,
+            279.00001525878906,
+            52.99999946355638,
             anchor="nw",
             text="Plug-in naam",
             fill="#000000",
@@ -354,14 +371,28 @@ class AdminApp:
         )
 
         entry_image_1 = PhotoImage(file=self.relative_to_assets("entry_1.png"))
-        canvas.create_image(316.99999237060547, 125.99999850988206, image=entry_image_1)
+        canvas.create_image(316.99999237060547, 88.99999850988206, image=entry_image_1)
         self.entry_name = Entry(bd=0, bg="#D9D9D9", fg="#000716", highlightthickness=0)
-        self.entry_name.place(x=221.0, y=109.99999946355638, width=191.99998474121094, height=29.999998092651367)
+        self.entry_name.place(x=221.0, y=72.99999946355638, width=191.99998474121094, height=29.999998092651367)
 
         entry_image_2 = PhotoImage(file=self.relative_to_assets("entry_2.png"))
-        canvas.create_image(315.99999237060547, 207.0000061392766, image=entry_image_2)
+        canvas.create_image(317.99999237060547, 155.99999850988206, image=entry_image_2)
         self.entry_license = Entry(bd=0, bg="#D9D9D9", fg="#000716", highlightthickness=0)
-        self.entry_license.place(x=220.0, y=191.0000070929509, width=191.99998474121094, height=29.999998092651367)
+        self.entry_license.place(x=222.0, y=139.99999946355638, width=191.99998474121094, height=29.999998092651367)
+
+        canvas.create_text(
+            304.00001525878906,
+            179.0000070929509,
+            anchor="nw",
+            text="Prijs",
+            fill="#000000",
+            font=("Inter", 12 * -1)
+        )
+
+        entry_image_3 = PhotoImage(file=self.relative_to_assets("entry_3.png"))
+        canvas.create_image(317.99999237060547, 215.0000061392766, image=entry_image_3)
+        self.entry_price = Entry(bd=0, bg="#D9D9D9", fg="#000716", highlightthickness=0)
+        self.entry_price.place(x=222.0, y=199.0000070929509, width=191.99998474121094, height=29.999998092651367)
 
     def run(self):
         self.window.resizable(False, False)
