@@ -32,7 +32,10 @@ class Login:
             if user["username"] == username and user["password"] == password:
                 messagebox.showinfo("Ingelogd", f"Welkom, {username}!")
                 self.window.destroy()  # Close login window
-                MainApp(user=username).run()  # Open main application
+                if user.get("role") == "admin":
+                    AdminApp(user=username).run()  # Open admin application if user is admin
+                else:
+                    MainApp(user=username).run()  # Open main application for regular users
                 return
 
         messagebox.showerror("Fout", "Ongeldige gebruikersnaam of wachtwoord.")
@@ -258,6 +261,107 @@ class MainApp:
 
         scrollbar = Scrollbar(self.window, command=self.plugins_frame.yview)
         scrollbar.place(x=1350, y=100, height=500)
+
+    def run(self):
+        self.window.resizable(False, False)
+        self.window.mainloop()
+
+class AdminApp:
+    def __init__(self, user):
+        self.current_user = user
+        self.plugin_file = PLUGIN_FILE
+        self.window = Tk()
+        self.window.geometry("662x393")
+        self.window.configure(bg="#FFFFFF")
+        self.assets_path = Path(r"build/assets/frame0")
+        self.setup_ui()
+
+    def relative_to_assets(self, path: str) -> Path:
+        return self.assets_path / Path(path)
+
+    def read_csv(self, file):
+        try:
+            with open(file, mode="r", encoding="utf-8") as f:
+                return list(csv.DictReader(f))
+        except FileNotFoundError:
+            messagebox.showerror("Fout", f"Het bestand {file} ontbreekt.")
+            return []
+
+    def write_csv(self, file, data, fieldnames):
+        with open(file, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+
+    def add_plugin(self):
+        plugin_name = self.entry_name.get()
+        license_type = self.entry_license.get()
+        manufacturer = self.current_user
+
+        if not plugin_name or not license_type:
+            messagebox.showerror("Fout", "Vul alle velden in.")
+            return
+
+        plugins = self.read_csv(self.plugin_file)
+        plugins.append({"plugin_name": plugin_name, "manufacturer": manufacturer, "license_type": license_type})
+        self.write_csv(self.plugin_file, plugins, fieldnames=["plugin_name", "manufacturer", "license_type"])
+
+        messagebox.showinfo("Succes", f"Plug-in '{plugin_name}' is toegevoegd aan beschikbare plug-ins!")
+
+    def setup_ui(self):
+        canvas = Canvas(
+            self.window,
+            bg="#FFFFFF",
+            height=393,
+            width=662,
+            bd=0,
+            highlightthickness=0,
+            relief="ridge"
+        )
+        canvas.place(x=0, y=0)
+
+        button_image_4 = PhotoImage(file=self.relative_to_assets("button_4.png"))
+        button_4 = Button(
+            image=button_image_4,
+            borderwidth=0,
+            highlightthickness=0,
+            command=self.add_plugin,
+            relief="flat"
+        )
+        button_4.place(
+            x=212.0,
+            y=272.99999487399896,
+            width=211.0000026822081,
+            height=51.000000774860155
+        )
+
+        canvas.create_text(
+            279.00001525878906,
+            165.99999946355638,
+            anchor="nw",
+            text="Licentie type",
+            fill="#000000",
+            font=("Inter", 12 * -1)
+        )
+
+        canvas.create_text(
+            271.00001525878906,
+            84.99999946355638,
+            anchor="nw",
+            text="Plug-in naam",
+            fill="#000000",
+            font=("Inter", 12 * -1)
+        )
+
+        entry_image_1 = PhotoImage(file=self.relative_to_assets("entry_1.png"))
+        canvas.create_image(316.99999237060547, 125.99999850988206, image=entry_image_1)
+        self.entry_name = Entry(bd=0, bg="#D9D9D9", fg="#000716", highlightthickness=0)
+        self.entry_name.place(x=221.0, y=109.99999946355638, width=191.99998474121094, height=29.999998092651367)
+
+        entry_image_2 = PhotoImage(file=self.relative_to_assets("entry_2.png"))
+        canvas.create_image(315.99999237060547, 207.0000061392766, image=entry_image_2)
+        self.entry_license = Entry(bd=0, bg="#D9D9D9", fg="#000716", highlightthickness=0)
+        self.entry_license.place(x=220.0, y=191.0000070929509, width=191.99998474121094, height=29.999998092651367)
 
     def run(self):
         self.window.resizable(False, False)
