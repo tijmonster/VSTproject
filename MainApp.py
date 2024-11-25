@@ -1,12 +1,11 @@
 from pathlib import Path
-from tkinter import Tk, Canvas, Entry, Button, PhotoImage, Scrollbar, Label, messagebox, Frame
+from tkinter import Tk, Canvas, Entry, Button, PhotoImage, Scrollbar, Label, messagebox, Frame, Text, VERTICAL, RIGHT, Y
 import csv
-import os
 
-# CSV file paths
+
 USER_FILE = "users.csv"
 PLUGIN_FILE = "plugins.csv"
-USER_PLUGINS_FILE = "user_plugins.csv"  # New file to store user-specific plugin ownership
+USER_PLUGINS_FILE = "user_plugins.csv"
 
 class Login:
     def __init__(self):
@@ -24,21 +23,26 @@ class Login:
             return list(csv.DictReader(f))
 
     def login(self):
-        username = self.entry_username.get()
-        password = self.entry_password.get()
-        users = self.read_csv(USER_FILE)
+        while True:
+            username = self.entry_username.get()
+            password = self.entry_password.get()
+            users = self.read_csv(USER_FILE)
 
-        for user in users:
-            if user["username"] == username and user["password"] == password:
-                messagebox.showinfo("Ingelogd", f"Welkom, {username}!")
-                self.window.destroy()  # Close login window
-                if user.get("role") == "admin":
-                    AdminApp(user=username).run()  # Open admin application if user is admin
-                else:
-                    MainApp(user=username).run()  # Open main application for regular users
-                return
+            # Check if the credentials are correct
+            for user in users:
+                if user["username"] == username and user["password"] == password:
+                    messagebox.showinfo("Ingelogd", f"Welkom, {username}!")
+                    self.window.destroy()
+                    if user.get("role") == "admin":
+                        AdminApp(user=username).run()  # Open admin application if user is admin
+                    else:
+                        MainApp(user=username).run()  # Open main application for regular users
+                    return
 
-        messagebox.showerror("Fout", "Ongeldige gebruikersnaam of wachtwoord.")
+            messagebox.showerror("Fout", "Ongeldige gebruikersnaam of wachtwoord.")
+            self.entry_username.delete(0, 'end')
+            self.entry_password.delete(0, 'end')
+            break
 
     def setup_ui(self):
         canvas = Canvas(
@@ -90,7 +94,7 @@ class MainApp:
         self.window.configure(bg="#FFFFFF")
         self.assets_path = Path(r"build/assets/frame0")
         self.setup_ui()
-        self.show_available_plugins()  # Initialize with available plugins
+        self.show_available_plugins()
 
     def relative_to_assets(self, path: str) -> Path:
         return self.assets_path / Path(path)
@@ -111,12 +115,12 @@ class MainApp:
 
     def show_plugins(self, plugins, owned=False):
         # Clear previous plugin frames
-        for widget in self.plugins_frame.winfo_children():
+        for widget in self.plugins_frame_inner.winfo_children():
             widget.destroy()
 
         # Create plugin elements dynamically
         for idx, plugin in enumerate(plugins):
-            frame = Frame(self.plugins_frame, bd=1, relief="solid", padx=10, pady=5, bg="#f5f5f5")
+            frame = Frame(self.plugins_frame_inner, bd=1, relief="solid", padx=10, pady=5, bg="#f5f5f5")
             frame.grid(row=idx, column=0, pady=5, padx=5, sticky="w")
 
             # Plugin details
@@ -149,7 +153,7 @@ class MainApp:
             else:
                 buy_button = Button(
                     frame,
-                    text=f"Koop (€{plugin['price']})",
+                    text=f"Koop ({plugin['price']})",
                     command=lambda p=plugin: self.buy_plugin(p),
                     font=("Arial", 10),
                     bg="#4CAF50",
@@ -196,17 +200,14 @@ class MainApp:
         self.show_owned_plugins()
 
     def download_plugin(self, plugin):
-        """Handles downloading a selected plugin."""
         plugin_name = plugin["plugin_name"]
         messagebox.showinfo("Download", f"Je hebt {plugin_name} gedownload!")
 
     def logout(self):
-        """Logs the user out and returns to the login screen."""
         self.window.destroy()
         Login().run()
 
     def setup_ui(self):
-        """Sets up the user interface."""
         canvas = Canvas(
             self.window,
             bg="#FFFFFF",
@@ -253,34 +254,31 @@ class MainApp:
         button_3.image = button_image_3
         button_3.place(x=94.0, y=650.0, width=230.0, height=75.0)
 
-
+        # Main area for listing plugins
         self.listbox_label = Label(self.window, text="Beschikbare Plug-ins", font=("Arial", 16), bg="#FFFFFF")
         self.listbox_label.place(x=500, y=50)
 
+        self.plugins_frame = Frame(self.window, bg="#FFFFFF")
+        self.plugins_frame.place(x=500, y=100, width=800, height=800)
 
-        self.plugins_canvas = Canvas(self.window, bg="#FFFFFF", height=600, width=800)
-        self.plugins_canvas.place(x=500, y=100)
+        # Add a canvas and scrollbar for the plugins frame
+        self.plugins_canvas = Canvas(self.plugins_frame, bg="#FFFFFF")
+        self.scrollbar = Scrollbar(self.plugins_frame, orient=VERTICAL, command=self.plugins_canvas.yview)
+        self.plugins_frame_inner = Frame(self.plugins_canvas, bg="#FFFFFF")
 
-        self.scrollbar = Scrollbar(self.window, orient="vertical", command=self.plugins_canvas.yview)
-        self.scrollbar.place(x=1350, y=100, height=600)
-
+        self.plugins_canvas.create_window((0, 0), window=self.plugins_frame_inner, anchor="nw")
         self.plugins_canvas.configure(yscrollcommand=self.scrollbar.set)
 
-        # Create a frame inside the canvas to hold the plugin elements
-        self.plugins_frame = Frame(self.plugins_canvas, bg="#FFFFFF")
-        self.plugins_frame.bind(
-            "<Configure>",
-            lambda e: self.plugins_canvas.configure(
-                scrollregion=self.plugins_canvas.bbox("all")
-            )
-        )
+        self.plugins_canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill=Y)
 
-        self.plugins_canvas.create_window((0, 0), window=self.plugins_frame, anchor="nw")
+        self.plugins_frame_inner.bind(
+            "<Configure>", lambda e: self.plugins_canvas.configure(scrollregion=self.plugins_canvas.bbox("all"))
+        )
 
     def run(self):
         self.window.resizable(False, False)
         self.window.mainloop()
-
 
 class AdminApp:
     def __init__(self, user):
